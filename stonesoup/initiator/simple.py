@@ -198,6 +198,10 @@ class GaussianParticleInitiator(Initiator):
         doc="Gaussian Initiator which will be used to generate tracks.")
     number_particles = Property(
         float, default=200, doc="Number of particles for initial track state")
+    use_fixed_covar = Property(
+        bool, default=False,
+        doc="If `True`, the Gaussian state covariance is used for the "
+            ":class:`~.ParticleState` as a fixed covariance. Default `False`.")
 
     def initiate(self, unassociated_detections, **kwargs):
         """Initiates tracks given unassociated measurements
@@ -224,6 +228,7 @@ class GaussianParticleInitiator(Initiator):
             track[-1] = ParticleStateUpdate(
                 particles,
                 track.hypothesis,
+                fixed_covar=track.covar if self.use_fixed_covar else None,
                 timestamp=track.timestamp)
 
         return tracks

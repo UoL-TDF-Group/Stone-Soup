@@ -80,6 +80,8 @@ def test_particlestate():
     with pytest.raises(TypeError):
         ParticleState()
 
+    assert isinstance(ParticleState([[0]]), State)
+
     # 1D
     num_particles = 10
     state_vector1 = StateVector([[0.]])

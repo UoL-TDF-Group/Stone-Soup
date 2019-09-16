@@ -16,7 +16,8 @@ from ...dataassociator.neighbour import NearestNeighbour
 from ...measures import Mahalanobis
 from ...types.detection import Detection
 from ...types.hypothesis import SingleHypothesis
-from ...types.state import GaussianState, ParticleState
+from ...types.state import GaussianState
+from ...types.update import ParticleStateUpdate
 from ..simple import (
     SinglePointInitiator, SimpleMeasurementInitiator,
     MultiMeasurementInitiator, GaussianParticleInitiator
@@ -277,7 +278,7 @@ def test_gaussian_particle(gaussian_initiator):
     tracks = particle_initiator.initiate(detections)
 
     for track in tracks:
-        assert isinstance(track.state, ParticleState)
+        assert isinstance(track.state, ParticleStateUpdate)
         if track.state_vector > 0:
             assert np.allclose(track.state_vector, np.array([[5]]), atol=0.4)
             assert track.state.hypothesis.measurement is detections[0]
