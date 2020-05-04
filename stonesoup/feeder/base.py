@@ -11,4 +11,4 @@ class Feeder(DetectionReader):
     modify the sequence, duplicate or drop data.
     """
 
-    detector = Property(DetectionReader, doc="Source of detections")
+    detector: DetectionReader = Property(doc="Source of detections")

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from abc import ABC
-from typing import List
 import copy
+from typing import Sequence, Tuple
 
 import numpy as np
 from scipy.linalg import inv, pinv, block_diag
@@ -30,7 +30,7 @@ class CombinedReversibleGaussianMeasurementModel(ReversibleModel, GaussianModel,
     :class:`~.LinearModel` or :class:`~.ReversibleModel`.
     """
     mapping = None
-    model_list = Property(List[MeasurementModel], doc="List of Measurement Models.")
+    model_list: Sequence[GaussianModel] = Property(doc="List of Measurement Models.")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -95,9 +95,9 @@ class NonLinearGaussianMeasurement(MeasurementModel, NonLinearModel, GaussianMod
     GaussianModel classes. It is not meant to be instantiated directly \
     but subclasses should be derived from this class.
     """
-    noise_covar = Property(CovarianceMatrix, doc="Noise covariance")
-    rotation_offset = Property(
-        StateVector, default=StateVector(np.array([[0], [0], [0]])),
+    noise_covar: CovarianceMatrix = Property(doc="Noise covariance")
+    rotation_offset: StateVector = Property(
+        default=StateVector([[0], [0], [0]]),
         doc="A 3x1 array of angles (rad), specifying the clockwise rotation\
             around each Cartesian axis in the order :math:`x,y,z`.\
             The rotation angles are positive if the rotation is in the \
@@ -196,8 +196,10 @@ class CartesianToElevationBearingRange(
 
     """  # noqa:E501
 
-    translation_offset = Property(
-        StateVector, default=StateVector(np.array([[0], [0], [0]])),
+    mapping: Tuple[int, int, int] = Property(
+        doc="Mapping between measurement and state dims in terms of :math:`x,y,z`")
+    translation_offset: StateVector = Property(
+        default=StateVector(np.array([[0], [0], [0]])),
         doc="A 3x1 array specifying the Cartesian origin offset in terms of :math:`x,y,z`\
             coordinates.")
 
@@ -238,7 +240,7 @@ class CartesianToElevationBearingRange(
                 noise = 0
 
         # Account for origin offset
-        xyz = state.state_vector[self.mapping] - self.translation_offset
+        xyz = state.state_vector[self.mapping, :] - self.translation_offset
 
         # Rotate coordinates
         xyz_rot = self._rotation_matrix @ xyz
@@ -325,10 +327,11 @@ class CartesianToBearingRange(NonLinearGaussianMeasurement, ReversibleModel):
 
     """  # noqa:E501
 
-    translation_offset = Property(
-        StateVector, default=StateVector(np.array([[0], [0]])),
-        doc="A 2x1 array specifying the origin offset in terms of :math:`x,y`\
-            coordinates.")
+    mapping: Tuple[int, int] = Property(
+        doc="Mapping between measurement and state dims in terms of :math:`x,y`")
+    translation_offset: StateVector = Property(
+        default=StateVector([[0], [0]]),
+        doc="A 2x1 array specifying the origin offset in terms of :math:`x,y` coordinates.")
 
     @property
     def ndim_meas(self):
@@ -465,10 +468,11 @@ class CartesianToElevationBearing(NonLinearGaussianMeasurement):
 
     """  # noqa:E501
 
-    translation_offset = Property(
-        StateVector, default=StateVector(np.array([[0], [0], [0]])),
-        doc="A 3x1 array specifying the origin offset in terms of :math:`x,y,z`\
-            coordinates.")
+    mapping: Tuple[int, int, int] = Property(
+        doc="Mapping between measurement and state dims in terms of :math:`x,y,z`")
+    translation_offset: StateVector = Property(
+        default=StateVector([[0], [0], [0]]),
+        doc="A 3x1 array specifying the origin offset in terms of :math:`x,y,z` coordinates.")
 
     @property
     def ndim_meas(self):
@@ -507,7 +511,7 @@ class CartesianToElevationBearing(NonLinearGaussianMeasurement):
                 noise = 0
 
         # Account for origin offset
-        xyz = state.state_vector[self.mapping] - self.translation_offset
+        xyz = state.state_vector[self.mapping, :] - self.translation_offset
 
         # Rotate coordinates
         xyz_rot = self._rotation_matrix @ xyz

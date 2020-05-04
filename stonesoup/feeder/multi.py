@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from typing import Collection
+
 from .base import Feeder
 from ..base import Property
 from ..buffered_generator import BufferedGenerator
@@ -12,7 +14,7 @@ class MultiDetectorFeeder(Feeder):
     yielding from the detector yielding the lowest timestamp first.
     """
     detector = None
-    detectors = Property([Detector], doc="Detectors to yield from")
+    detectors: Collection[Detector] = Property(doc="Detectors to yield from")
 
     @BufferedGenerator.generator_method
     def detections_gen(self):

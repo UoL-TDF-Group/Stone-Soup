@@ -32,26 +32,24 @@ class EuclideanTrackToTrack(TrackToTrackAssociator):
     combinations
     """
 
-    association_threshold = Property(
-        float, default=10,
+    association_threshold: float = Property(
+        default=10,
         doc="Threshold distance measure which states must be within for an "
             "association to be recorded.Default is 10")
-    consec_pairs_confirm = Property(
-        int, default=3,
+    consec_pairs_confirm: int = Property(
+        default=3,
         doc="Number of consecutive time instances which track pairs are "
             "required to be within a specified threshold in order for an "
             "association to be formed. Default is 3")
-    consec_misses_end = Property(
-        int, default=2,
+    consec_misses_end: int = Property(
+        default=2,
         doc="Number of consecutive time instances which track pairs are "
             "required to exceed a specified threshold in order for an "
             "association to be ended. Default is 2")
-    measurement_model_track1 = Property(
-        MeasurementModel,
+    measurement_model_track1: MeasurementModel = Property(
         doc="Measurement model which specifies which elements within the "
             "track state are to be used to calculate distance over")
-    measurement_model_track2 = Property(
-        MeasurementModel,
+    measurement_model_track2: MeasurementModel = Property(
         doc="Measurement model which specifies which elements within the "
             "track state are to be used to calculate distance over")
 
@@ -162,29 +160,24 @@ class EuclideanTrackToTruth(TrackToTrackAssociator):
     Tracks (one-2-many relationship).
     """
 
-    association_threshold = Property(
-        float,
+    association_threshold: float = Property(
         default=10,
         doc="Threshold distance measure which states must be within for an "
             "association to be recorded.Default is 10")
-    consec_pairs_confirm = Property(
-        int,
+    consec_pairs_confirm: int = Property(
         default=3,
         doc="Number of consecutive time instances which track-truth pairs are "
             "required to be within a specified threshold in order for an "
             "association to be formed. Default is 3")
-    consec_misses_end = Property(
-        int,
+    consec_misses_end: int = Property(
         default=2,
         doc="Number of consecutive time instances which track-truth pairs are "
             "required to exceed a specified threshold in order for an "
             "association to be ended. Default is 2")
-    measurement_model_track = Property(
-        MeasurementModel,
+    measurement_model_track: MeasurementModel = Property(
         doc="Measurement model which specifies which elements within the "
             "track state are to be used to calculate distance over")
-    measurement_model_truth = Property(
-        MeasurementModel,
+    measurement_model_truth: MeasurementModel = Property(
         doc="Measurement model which specifies which elements within the "
             "truth state are to be used to calculate distance over")
 

@@ -57,8 +57,8 @@ class KalmanUpdater(Updater):
 
     # TODO: at present this will throw an error if a measurement model is not
     # TODO: specified in either individual measurements or the Updater object
-    measurement_model = Property(
-        LinearGaussian, default=None,
+    measurement_model: LinearGaussian = Property(
+        default=None,
         doc="A linear Gaussian measurement model. This need not be defined if "
             "a measurement model is provided in the measurement. If no model "
             "specified on construction, or in the measurement, then error "
@@ -229,8 +229,8 @@ class ExtendedKalmanUpdater(KalmanUpdater):
     """
     # TODO: Enforce the fact that this version of MeasurementModel must be
     # TODO: capable of executing :attr:`jacobian()`
-    measurement_model = Property(
-        MeasurementModel, default=None,
+    measurement_model: MeasurementModel = Property(
+        default=None,
         doc="A measurement model. This need not be defined if a measurement "
             "model is provided in the measurement. If no model specified on "
             "construction, or in the measurement, then error will be thrown. "
@@ -278,25 +278,21 @@ class UnscentedKalmanUpdater(KalmanUpdater):
 
     """
     # Can be non-linear and non-differentiable
-    measurement_model = Property(
-        MeasurementModel,
+    measurement_model: MeasurementModel = Property(
         default=None,
         doc="The measurement model to be used. This need not be defined if a "
             "measurement model is provided in the measurement. If no model "
             "specified on construction, or in the measurement, then error "
             "will be thrown.")
-    alpha = Property(
-        float,
+    alpha: float = Property(
         default=0.5,
         doc="Primary sigma point spread scaling parameter. Default is 0.5.")
-    beta = Property(
-        float,
+    beta: float = Property(
         default=2,
         doc="Used to incorporate prior knowledge of the distribution. If the "
             "true distribution is Gaussian, the value of 2 is optimal. "
             "Default is 2")
-    kappa = Property(
-        float,
+    kappa: float = Property(
         default=0,
         doc="Secondary spread scaling parameter. Default is calculated as "
             "3-Ns")

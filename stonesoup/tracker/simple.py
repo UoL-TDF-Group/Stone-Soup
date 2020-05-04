@@ -35,21 +35,12 @@ class SingleTargetTracker(Tracker):
         Current track being maintained. Also accessible as the sole item in
         :attr:`tracks`
     """
-    initiator = Property(
-        Initiator,
-        doc="Initiator used to initialise the track.")
-    deleter = Property(
-        Deleter,
-        doc="Deleter used to delete the track")
-    detector = Property(
-        DetectionReader,
-        doc="Detector used to generate detection objects.")
-    data_associator = Property(
-        DataAssociator,
+    initiator: Initiator = Property(doc="Initiator used to initialise the track.")
+    deleter: Deleter = Property(doc="Deleter used to delete the track")
+    detector: DetectionReader = Property(doc="Detector used to generate detection objects.")
+    data_associator: DataAssociator = Property(
         doc="Association algorithm to pair predictions to detections")
-    updater = Property(
-        Updater,
-        doc="Updater used to update the track object to the new state.")
+    updater: Updater = Property(doc="Updater used to update the track object to the new state.")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -92,21 +83,12 @@ class MultiTargetTracker(Tracker):
     Parameters
     ----------
     """
-    initiator = Property(
-        Initiator,
-        doc="Initiator used to initialise the track.")
-    deleter = Property(
-        Deleter,
-        doc="Initiator used to initialise the track.")
-    detector = Property(
-        DetectionReader,
-        doc="Detector used to generate detection objects.")
-    data_associator = Property(
-        DataAssociator,
+    initiator: Initiator = Property(doc="Initiator used to initialise the track.")
+    deleter: Deleter = Property(doc="Initiator used to initialise the track.")
+    detector: DetectionReader = Property(doc="Detector used to generate detection objects.")
+    data_associator: DataAssociator = Property(
         doc="Association algorithm to pair predictions to detections")
-    updater = Property(
-        Updater,
-        doc="Updater used to update the track object to the new state.")
+    updater: Updater = Property(doc="Updater used to update the track object to the new state.")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -151,21 +133,12 @@ class MultiTargetMixtureTracker(Tracker):
     Parameters
     ----------
     """
-    initiator = Property(
-        Initiator,
-        doc="Initiator used to initialise the track.")
-    deleter = Property(
-        Deleter,
-        doc="Initiator used to initialise the track.")
-    detector = Property(
-        DetectionReader,
-        doc="Detector used to generate detection objects.")
-    data_associator = Property(
-        DataAssociator,
+    initiator: Initiator = Property(doc="Initiator used to initialise the track.")
+    deleter: Deleter = Property(doc="Initiator used to initialise the track.")
+    detector: DetectionReader = Property(doc="Detector used to generate detection objects.")
+    data_associator: DataAssociator = Property(
         doc="Association algorithm to pair predictions to detections")
-    updater = Property(
-        Updater,
-        doc="Updater used to update the track object to the new state.")
+    updater: Updater = Property(doc="Updater used to update the track object to the new state.")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

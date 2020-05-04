@@ -19,8 +19,7 @@ class PDA(DataAssociator):
     probability that it is associated to each specific detection.
     """
 
-    hypothesiser = Property(
-        Hypothesiser,
+    hypothesiser: Hypothesiser = Property(
         doc="Generate a set of hypotheses for each prediction-detection pair")
 
     def associate(self, tracks, detections, time):
@@ -73,11 +72,9 @@ class JPDA(DataAssociator):
     takes place in the function :meth:`enumerate_JPDA_hypotheses`.
     """
 
-    hypothesiser = Property(
-        PDAHypothesiser,
+    hypothesiser: PDAHypothesiser = Property(
         doc="Generate a set of hypotheses for each prediction-detection pair")
-    gate_ratio = Property(
-        float,
+    gate_ratio: float = Property(
         doc="If probability of Detection/Track association is less than this "
             "many times less than probability of MissedDetection, treat "
             "probability of association as 0."

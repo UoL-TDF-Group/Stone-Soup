@@ -3,9 +3,8 @@ import datetime
 import weakref
 from abc import abstractmethod, ABC
 from functools import lru_cache
-
 from math import cos, sin
-from typing import Sequence, Optional, List, TYPE_CHECKING
+from typing import Sequence, MutableSequence, Optional, TYPE_CHECKING
 
 from scipy.linalg import expm
 import numpy as np
@@ -15,6 +14,7 @@ from ..types.array import StateVector
 from ..base import Base, Property
 from ..types.state import State
 from ..models.transition import TransitionModel
+
 if TYPE_CHECKING:  # pragma: no cover
     from ..sensor.base import BaseSensor
 
@@ -37,29 +37,30 @@ class Platform(Base, ABC):
             :class:`~.MovingPlatform`
 
         """
-    state = Property(State, doc="The platform state at any given point. For a static platform, "
-                                "this would usually contain its position coordinates in the form"
-                                "``[x, y, z]``. For a moving platform it would contain position "
-                                "and velocity interleaved: ``[x, vx, y, vy, z, vz]``")
-    position_mapping = Property(Sequence[int],
-                                doc="Mapping between platform position and state vector. For a "
-                                    "position-only 3d platform this might be ``[0, 1, 2]``. For a "
-                                    "position and velocity platform: ``[0, 2, 4]``")
-    rotation_offsets = Property(List[StateVector], default=None,
-                                doc="A list of StateVectors containing the sensor rotation "
-                                    "offsets from the platform's primary axis (defined as the "
-                                    "direction of motion). Defaults to a zero vector with the "
-                                    "same length as the Platform's :attr:`position_mapping`")
-    mounting_offsets = Property(List[StateVector], default=None,
-                                doc="A list of StateVectors containing the sensor translation "
-                                    "offsets from the platform's reference point. Defaults to "
-                                    "a zero vector with the same length as the Platform's "
-                                    ":attr:`position_mapping`")
-    sensors = Property(List["BaseSensor"],  default=None,
-                       doc="A list of N mounted sensors. Defaults to an empty list")
-    velocity_mapping = Property(Sequence[int], default=None,
-                                doc="Mapping between platform velocity and state dims. If not "
-                                    "set, it will default to ``[m+1 for m in position_mapping]``")
+    state: State = Property(
+        doc="The platform state at any given point. For a static platform, this would usually "
+            "contain its position coordinates in the form``[x, y, z]``. For a moving platform it "
+            "would contain position and velocity interleaved: ``[x, vx, y, vy, z, vz]``")
+    position_mapping: Sequence[int] = Property(
+        doc="Mapping between platform position and state vector. For a position-only 3d platform "
+            "this might be ``[0, 1, 2]``. For a position and velocity platform: ``[0, 2, 4]``")
+    rotation_offsets: MutableSequence[StateVector] = Property(
+        default=None,
+        doc="A list of StateVectors containing the sensor rotation offsets from the platform's "
+            "primary axis (defined as the direction of motion). Defaults to a zero vector with "
+            "the same length as the Platform's :attr:`position_mapping`")
+    mounting_offsets: MutableSequence[StateVector] = Property(
+        default=None,
+        doc="A list of StateVectors containing the sensor translation offsets from the platform's "
+            "reference point. Defaults to a zero vector with the same length as the Platform's "
+            ":attr:`position_mapping`")
+    sensors: MutableSequence['BaseSensor'] = Property(
+        default=None,
+        doc="A list of N mounted sensors. Defaults to an empty list")
+    velocity_mapping: Sequence[int] = Property(
+        default=None,
+        doc="Mapping between platform velocity and state dims. If not set, it will default to "
+            "``[m+1 for m in position_mapping]``")
 
     # TODO: Determine where a platform coordinate frame should be maintained
 
@@ -274,9 +275,9 @@ class FixedPlatform(Platform):
 
         .. note:: Position and orientation are a read/write properties in this class.
         """
-    orientation = Property(StateVector, default=None,
-                           doc='A fixed orientation of the static platform. '
-                               'Defaults to the zero vector')
+    orientation: StateVector = Property(
+        default=None,
+        doc='A fixed orientation of the static platform. Defaults to the zero vector')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -313,8 +314,7 @@ class MovingPlatform(Platform):
 
     .. note:: Position and orientation are a read only properties in this class.
     """
-    transition_model = Property(
-        TransitionModel, doc="Transition model")
+    transition_model: TransitionModel = Property(doc="Transition model")
 
     @property
     def velocity(self) -> StateVector:

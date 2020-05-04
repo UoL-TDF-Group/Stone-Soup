@@ -14,7 +14,7 @@ class TimeBufferedFeeder(Feeder):
     Any "old" detections (where the time is earlier than the head of the
     buffer) shall be dropped, producing a :class:`UserWarning`.
     """
-    buffer_size = Property(int, default=1000, doc="Max size of buffer")
+    buffer_size: int = Property(default=1000, doc="Max size of buffer")
 
     @BufferedGenerator.generator_method
     def detections_gen(self):
@@ -47,8 +47,7 @@ class TimeSyncFeeder(Feeder):
     the case.
     """
 
-    time_window = Property(
-        datetime.timedelta,
+    time_window: datetime.timedelta = Property(
         default=datetime.timedelta(seconds=1),
         doc="Time window to group detections")
 

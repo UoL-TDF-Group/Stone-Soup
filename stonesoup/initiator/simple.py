@@ -24,8 +24,8 @@ class SinglePointInitiator(GaussianInitiator):
     provided :attr:`prior_state` for each unassociated detection.
     """
 
-    prior_state = Property(GaussianState, doc="Prior state information")
-    measurement_model = Property(MeasurementModel, doc="Measurement model")
+    prior_state: GaussianState = Property(doc="Prior state information")
+    measurement_model: MeasurementModel = Property(doc="Measurement model")
 
     def initiate(self, unassociated_detections, **kwargs):
         """Initiates tracks given unassociated measurements
@@ -71,8 +71,8 @@ class SimpleMeasurementInitiator(GaussianInitiator):
     This then replaces mapped values in the :attr:`prior_state` to form the
     initial :class:`~.GaussianState` of the :class:`~.Track`.
     """
-    prior_state = Property(GaussianState, doc="Prior state information")
-    measurement_model = Property(MeasurementModel, doc="Measurement model")
+    prior_state: GaussianState = Property(doc="Prior state information")
+    measurement_model: MeasurementModel = Property(doc="Measurement model")
 
     def initiate(self, detections, **kwargs):
         tracks = set()
@@ -133,18 +133,15 @@ class MultiMeasurementInitiator(GaussianInitiator):
     initiated only to then be removed shortly after.
     Does cause slight delay in initiation to tracker."""
 
-    prior_state = Property(GaussianState, doc="Prior state information")
-    measurement_model = Property(MeasurementModel, doc="Measurement model")
-    deleter = Property(Deleter, doc="Deleter used to delete the track.")
-    data_associator = Property(
-        DataAssociator,
+    prior_state: GaussianState = Property(doc="Prior state information")
+    measurement_model: MeasurementModel = Property(doc="Measurement model")
+    deleter: Deleter = Property(doc="Deleter used to delete the track.")
+    data_associator: DataAssociator = Property(
         doc="Association algorithm to pair predictions to detections.")
-    updater = Property(
-        Updater,
+    updater: Updater = Property(
         doc="Updater used to update the track object to the new state.")
-    min_points = Property(
-        int, default=2,
-        doc="Minimum number of track points required to confirm a track.")
+    min_points: int = Property(
+        default=2, doc="Minimum number of track points required to confirm a track.")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -193,11 +190,10 @@ class GaussianParticleInitiator(Initiator):
     :class:`~.ParticleState`.
     """
 
-    initiator = Property(
-        GaussianInitiator,
+    initiator: GaussianInitiator = Property(
         doc="Gaussian Initiator which will be used to generate tracks.")
-    number_particles = Property(
-        float, default=200, doc="Number of particles for initial track state")
+    number_particles: int = Property(
+        default=200, doc="Number of particles for initial track state")
 
     def initiate(self, unassociated_detections, **kwargs):
         """Initiates tracks given unassociated measurements

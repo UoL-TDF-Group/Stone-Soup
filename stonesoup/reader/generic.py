@@ -8,6 +8,8 @@ of data that is in common formats.
 import csv
 from collections import defaultdict
 from datetime import datetime, timedelta
+from typing import MutableSequence, Mapping, Any
+
 from math import modf
 
 import numpy as np
@@ -22,18 +24,18 @@ from ..types.groundtruth import GroundTruthPath, GroundTruthState
 
 
 class CSVGroundTruthReader(GroundTruthReader, TextFileReader):
-    state_vector_fields = Property(
-        [str], doc='List of columns names to be used in state vector')
-    time_field = Property(
-        str, doc='Name of column to be used as time field')
-    time_field_format = Property(
-        str, default=None, doc='Optional datetime format')
-    timestamp = Property(
-        bool, default=False, doc='Treat time field as a timestamp from epoch')
-    path_id_field = Property(
-        str, doc='Name of column to be used as path ID')
-    csv_options = Property(
-        dict, default={},
+    state_vector_fields: MutableSequence[str] = Property(
+        doc='MutableSequence of columns names to be used in state vector')
+    time_field: str = Property(
+        doc='Name of column to be used as time field')
+    time_field_format: str = Property(
+        default=None, doc='Optional datetime format')
+    timestamp: bool = Property(
+        default=False, doc='Treat time field as a timestamp from epoch')
+    path_id_field: str = Property(
+        doc='Name of column to be used as path ID')
+    csv_options: Mapping[str, Any] = Property(
+        default={},
         doc='Keyword arguments for the underlying csv reader')
 
     def __init__(self, *args, **kwargs):
@@ -82,19 +84,18 @@ class CSVDetectionReader(DetectionReader, TextFileReader):
     ----------
     """
 
-    state_vector_fields = Property(
-        [str], doc='List of columns names to be used in state vector')
-    time_field = Property(
-        str, doc='Name of column to be used as time field')
-    time_field_format = Property(
-        str, default=None, doc='Optional datetime format')
-    timestamp = Property(
-        bool, default=False, doc='Treat time field as a timestamp from epoch')
-    metadata_fields = Property(
-        [str], default=None, doc='List of columns to be saved as metadata, '
-                                 'default all')
-    csv_options = Property(
-        dict, default={},
+    state_vector_fields: MutableSequence[str] = Property(
+        doc='MutableSequence of columns names to be used in state vector')
+    time_field: str = Property(
+        doc='Name of column to be used as time field')
+    time_field_format: str = Property(
+        default=None, doc='Optional datetime format')
+    timestamp: bool = Property(
+        default=False, doc='Treat time field as a timestamp from epoch')
+    metadata_fields: MutableSequence[str] = Property(
+        default=None, doc='MutableSequence of columns to be saved as metadata, default all')
+    csv_options: Mapping[str, Any] = Property(
+        default={},
         doc='Keyword arguments for the underlying csv reader')
 
     @BufferedGenerator.generator_method

@@ -10,15 +10,11 @@ class FilteredDetectionsHypothesiser(Hypothesiser):
     they are fed into the hypothesiser.
     """
 
-    hypothesiser = Property(
-        Hypothesiser, doc="Hypothesiser that is being wrapped.")
-    metadata_filter = Property(
-        str, doc="Metadata attribute used to filter which detections "
-                 "tracks are valid for association.")
-    match_missing = Property(
-        bool,
-        default=True,
-        doc="Match detections with missing metadata. Default 'True'.")
+    hypothesiser: Hypothesiser = Property(doc="Hypothesiser that is being wrapped.")
+    metadata_filter: str = Property(
+        doc="Metadata attribute used to filter which detections tracks are valid for association.")
+    match_missing: bool = Property(
+        default=True, doc="Match detections with missing metadata. Default 'True'.")
 
     def hypothesise(self, track, detections, *args, **kwargs):
         """

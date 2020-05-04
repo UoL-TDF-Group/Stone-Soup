@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import datetime
-from collections.abc import MutableSequence
+from collections import abc
+from typing import MutableSequence
 
 import numpy as np
 
@@ -14,9 +15,9 @@ class State(Type):
     """State type.
 
     Most simple state type, which only has time and a state vector."""
-    timestamp = Property(datetime.datetime, default=None,
-                         doc="Timestamp of the state. Default None.")
-    state_vector = Property(StateVector, doc='State vector.')
+    timestamp: datetime.datetime = Property(
+        default=None, doc="Timestamp of the state. Default None.")
+    state_vector: StateVector = Property(doc='State vector.')
 
     def __init__(self, state_vector, *args, **kwargs):
         # Don't cast away subtype of state_vector if not necessary
@@ -31,7 +32,7 @@ class State(Type):
         return self.state_vector.shape[0]
 
 
-class StateMutableSequence(Type, MutableSequence):
+class StateMutableSequence(Type, abc.MutableSequence):
     """A mutable sequence for :class:`~.State` instances
 
     This sequence acts like a regular list object for States, as well as
@@ -52,11 +53,9 @@ class StateMutableSequence(Type, MutableSequence):
     [[1]] 2018-01-01 14:01:00
     """
 
-    states = Property(
-        [State],
+    states: MutableSequence[State] = Property(
         default=None,
-        doc="The initial list of states. Default `None` which initialises"
-            "with empty list.")
+        doc="The initial list of states. Default `None` which initialises with empty list.")
 
     def __init__(self, states=None, *args, **kwargs):
         if states is None:
@@ -126,7 +125,7 @@ class GaussianState(State):
     This is a simple Gaussian state object, which, as the name suggests,
     is described by a Gaussian state distribution.
     """
-    covar = Property(CovarianceMatrix, doc='Covariance matrix of state.')
+    covar: CovarianceMatrix = Property(doc='Covariance matrix of state.')
 
     def __init__(self, state_vector, covar, *args, **kwargs):
         covar = CovarianceMatrix(covar)
@@ -147,7 +146,7 @@ class WeightedGaussianState(GaussianState):
     Gaussian State object with an associated weight.  Used as components
     for a GaussianMixtureState.
     """
-    weight = Property(float, default=0, doc="Weight of the Gaussian State.")
+    weight: float = Property(default=0, doc="Weight of the Gaussian State.")
 
 
 class ParticleState(Type):
@@ -156,10 +155,9 @@ class ParticleState(Type):
     This is a particle state object which describes the state as a
     distribution of particles"""
 
-    timestamp = Property(datetime.datetime, default=None,
-                         doc="Timestamp of the state. Default None.")
-    particles = Property([Particle],
-                         doc='List of particles representing state')
+    timestamp: datetime.datetime = Property(
+        default=None, doc="Timestamp of the state. Default None.")
+    particles: MutableSequence[Particle] = Property(doc='List of particles representing state')
 
     @property
     def mean(self):
