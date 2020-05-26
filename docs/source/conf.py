@@ -46,7 +46,7 @@ autodoc_default_options = {
     'members': None,
     'member-order': 'bysource',
 }
-autodoc_mock_imports = ['ffmpeg', 'moviepy']
+autodoc_mock_imports = ['ffmpeg', 'moviepy', 'tensorflow', 'tensornets']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
