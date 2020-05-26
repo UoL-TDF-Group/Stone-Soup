@@ -7,6 +7,8 @@ Detectors
 .. automodule:: stonesoup.detector.base
     :show-inheritance:
 
+TensorNets
+----------
 .. automodule:: stonesoup.detector.tensornets
     :show-inheritance:
 
