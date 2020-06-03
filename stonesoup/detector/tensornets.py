@@ -14,6 +14,7 @@ try:
         tf.disable_v2_behavior()
 
     import tensornets
+    from tensornets import datasets
 except ImportError as error:
     raise ImportError(
         "Usage of 'stonesoup.detector.tensornets' requires that the optional"
@@ -68,9 +69,9 @@ class TensorNetsObjectDetector(Detector):
     @property
     def class_names(self):
         if 'VOC' in self.net.name:
-            class_names = tensornets.datasets.voc.classnames
+            class_names = datasets.voc.classnames
         elif 'COCO' in self.net.name:
-            class_names = tensornets.datasets.coco.classnames
+            class_names = datasets.coco.classnames
         else:
             raise NotImplementedError("Unsupported network {!r}".format(self.net))
         return class_names
