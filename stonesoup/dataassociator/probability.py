@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
+import numpy as np
 
 from .base import DataAssociator
-from ..base import Property
+from ..base import Property, Base
 from ..hypothesiser import Hypothesiser
 from ..hypothesiser.probability import PDAHypothesiser
 from ..types.detection import MissedDetection
@@ -212,3 +213,291 @@ class JPDA(DataAssociator):
                 measurements.add(measurement)
 
         return True
+
+
+class JPDAwithEHM(JPDA):
+    def associate(self, tracks, detections, time):
+        """Associate detections with predicted states.
+
+        Parameters
+        ----------
+        tracks : list of :class:`Track`
+            Current tracked objects
+        detections : list of :class:`Detection`
+            Retrieved measurements
+        time : datetime
+            Detection time to predict to
+
+        Returns
+        -------
+        dict
+            Key value pair of tracks with associated detection
+        """
+
+        # Calculate MultipleHypothesis for each Track over all
+        # available Detections
+        hypotheses = {
+            track: self.hypothesiser.hypothesise(track, detections, time)
+            for track in tracks}
+
+        new_hypotheses = self._run_EHM(tracks, detections, hypotheses, time)
+
+        return new_hypotheses
+
+    def _run_EHM(self, tracks, detections, hypotheses, time):
+
+        track_list = list(tracks)
+        detection_list = list(detections)
+
+        net, l_matrix = self._construct_EHM_net(track_list, detection_list, hypotheses)
+        a_matrix = self._compute_association_weights(net, l_matrix)
+
+        # Calculate MultiMeasurementHypothesis for each Track over all
+        # available Detections with probabilities drawn from JointHypotheses
+        new_hypotheses = dict()
+
+        for i, track in enumerate(track_list):
+
+            single_measurement_hypotheses = list()
+
+            prob_misdetect = Probability(a_matrix[i, 0])
+
+            single_measurement_hypotheses.append(
+                SingleProbabilityHypothesis(
+                    hypotheses[track][0].prediction,
+                    MissedDetection(timestamp=time),
+                    measurement_prediction=hypotheses[track][0].measurement_prediction,
+                    probability=prob_misdetect))
+
+            # record hypothesis for any given Detection being associated with
+            # this track
+            for hypothesis in hypotheses[track]:
+                if not hypothesis:
+                    continue
+
+                j = next(i+1 for i, detection in enumerate(detection_list)
+                         if hypothesis.measurement == detection)
+
+                pro_detect_assoc = Probability(a_matrix[i, j])
+
+                single_measurement_hypotheses.append(
+                    SingleProbabilityHypothesis(
+                        hypothesis.prediction,
+                        hypothesis.measurement,
+                        measurement_prediction=hypothesis.measurement_prediction,
+                        probability=pro_detect_assoc))
+
+            result = MultipleHypothesis(single_measurement_hypotheses, True, 1)
+
+            new_hypotheses[track] = result
+
+        return new_hypotheses
+
+    def _construct_EHM_net(self, tracks, detections, hypotheses):
+
+        num_tracks = len(tracks)
+        num_detections = len(detections)
+
+        # Construct validation and likelihood matrices
+        # Both matrices have shape (num_tracks, num_detections + 1), where the first column
+        # corresponds to the null hypothesis.
+        l_matrix = np.zeros((num_tracks, num_detections + 1))
+        for i, track in enumerate(tracks):
+            for hyp in hypotheses[track]:
+                if not hyp:
+                    l_matrix[i, 0] = hyp.weight
+                else:
+                    j = next(d_i for d_i, detection in enumerate(detections)
+                             if hyp.measurement == detection)
+                    l_matrix[i, j+1] = hyp.weight
+        v_matrix = l_matrix > 0
+
+        class Node(Base):
+            track_ind = Property(int, doc="Index of track to which the node relates",
+                                 default=-1)
+            detections = Property(set, doc="Set of detection indices examined up to that node",
+                                    default=None)
+            parents = Property(set, doc="Set of parent node indices",
+                               default=None)
+            children = Property(set, doc="Set of child node indices",
+                                default=None)
+            remainders = Property(set, doc="Set of remainder detection indices",
+                                  default = None)
+
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                if self.detections is None:
+                    self.detections = set()
+                if self.parents is None:
+                    self.parents = set()
+                if self.children is None:
+                    self.children = set()
+                if self.remainders is None:
+                    self.remainders = set([di for di in range(num_detections + 1)])
+
+        class Net(Base):
+            nodes = Property([Node], doc="List of nodes in the net")
+            edges = Property(dict, doc="Dictionary whose keys are in the form (p_i, c_i), where "
+                                       "p_i and c_i are the parent and child node indices"
+                                       "respectively. The value of each entry contains the set of"
+                                       "detection indices that relate the two nodes.",
+                             default=dict())
+
+            @property
+            def num_nodes(self):
+                return len(self.nodes)
+
+            def add_node(self, node, parent_ind, detections):
+                child_ind = len(self.nodes)
+                self.nodes.append(node)
+
+                # Add child to list of parent's children
+                self.nodes[parent_ind].children.add(child_ind)
+
+                # Create edge from parent to child
+                net.edges[(parent_ind, child_ind)] = detections
+
+
+        root_node = Node()
+        net = Net([root_node])
+
+        # A layer in the network is created for each track (not counting the root-node layer)
+        num_layers = num_tracks
+        for i in range(num_layers):
+
+            # Get list of (index, node) of nodes in previous layer
+            parent_nodes = [(n_i, node) for n_i, node in enumerate(net.nodes)
+                            if node.track_ind == i-1]
+
+            # Get indices of measurements associated with track
+            v_detection_inds = set(np.nonzero(v_matrix[i, :])[0])
+
+            # For all nodes in previous layer
+            for p_i, parent in parent_nodes:
+
+                # Get measurements to consider
+                v_detection_inds_m1 = v_detection_inds - parent.detections | {0}
+
+                # Iterate over measurements
+                for j in v_detection_inds_m1:
+
+                    # Get list of (index, node) of nodes in current layer
+                    child_nodes = [(n_i, node) for n_i, node in enumerate(net.nodes)
+                                   if node.track_ind == i]
+
+                    # If layer is empty, add new node
+                    if not len(child_nodes):
+
+                        # Create new node
+                        child = Node(i, parent.detections | {j}, {p_i})
+
+                        # Compute remainders
+                        remainders = set()
+                        for ii in range(i + 1, num_layers):
+                            remainders |= set(np.nonzero(v_matrix[ii, :])[0])
+                        child.remainders = remainders - (child.detections - {0})
+
+                        # Add node to net
+                        net.add_node(child, p_i, {j})
+
+                    else:
+                        # Compute remainders (i-1)
+                        remainders_im1 = set()
+                        for ii in range(i + 1, num_layers):
+                            remainders_im1 |= set(np.nonzero(v_matrix[ii, :])[0])
+                        remainders_im1 -= (parent.detections | {j}) - {0}
+
+                        matched = False
+
+                        # For all nodes in current layer
+                        for c_i, child in child_nodes:
+
+                            # If the node's list of remainders is equal to previous remainders
+                            if remainders_im1 == child.remainders:
+                                # Simply add new edge and update parent/child relationships
+                                if (p_i, c_i) in net.edges:
+                                    net.edges[(p_i, c_i)].add(j)
+                                else:
+                                    net.edges[(p_i, c_i)] = {j}
+
+                                parent.children.add(c_i)
+                                child.parents.add(p_i)
+                                child.detections |= parent.detections | {j}
+
+                                matched = True
+
+                        if not matched:
+
+                            # Create new node
+                            child = Node(i, parent.detections | {j}, {p_i})
+
+                            # Compute remainders
+                            remainders = set()
+                            for ii in range(i + 1, num_layers):
+                                remainders |= set(np.nonzero(v_matrix[ii, :])[0])
+                            child.remainders = remainders - (child.detections - {0})
+
+                            # Add node to net
+                            net.add_node(child, p_i, {j})
+
+        return net, l_matrix
+
+    def _compute_association_weights(self, net, l_matrix):
+        num_tracks, num_detections = l_matrix.shape
+        num_nodes = net.num_nodes
+
+        # Compute p_D (Forward-pass)
+        p_D = np.zeros((num_nodes, ))
+        p_D[0] = 1
+        for c_i, child in enumerate(net.nodes):
+            if not c_i:
+                continue
+            # parents = [edge[0] for edge in net.edges if edge[1] == c_i]
+            for p_i in child.parents:
+                p_D_m1 = p_D[p_i]
+                for j in net.edges[(p_i, c_i)]:
+                    p_D[c_i] += l_matrix[child.track_ind, j]*p_D_m1
+
+        # Compute p_U (Backward-pass)
+        p_U = np.zeros((num_nodes, ))
+        p_U[-1] = 1
+        for p_i, parent in reversed(list(enumerate(net.nodes))):
+            if p_i == net.num_nodes-1:
+                continue
+            for c_i in parent.children:
+                child = net.nodes[c_i]
+                p_U_p1 = p_U[c_i]
+                if (p_i, c_i) in net.edges:
+                    for j in net.edges[(p_i, c_i)]:
+                        p_U[p_i] += l_matrix[child.track_ind, j]*p_U_p1
+
+        # Compute p_DT
+        p_DT = np.zeros((num_detections, num_nodes))
+        for c_i, child in enumerate(net.nodes):
+            for j in range(num_detections):
+                valid_pis = [edge[0] for edge, value in net.edges.items()
+                             if (j in value and edge[1] == c_i)]
+
+                for p_i in valid_pis:
+                    p_D_m1 = p_D[p_i]
+                    p_DT[j, c_i] += p_D_m1
+
+        # Compute p_T
+        p_T = np.ones((num_detections, num_nodes))
+        p_T[:, 0] = 0
+        for n_i, node in enumerate(net.nodes):
+            if not n_i:
+                continue
+            for j in range(num_detections):
+                p_T[j, n_i] = p_U[n_i]*l_matrix[node.track_ind, j]*p_DT[j, n_i]
+
+        # Compute beta
+        beta = np.zeros(l_matrix.shape)
+        for i in range(num_tracks):
+            node_inds = [n_i for n_i, node in enumerate(net.nodes) if node.track_ind == i]
+            for j in range(num_detections):
+                beta[i, j] = np.sum(p_T[j, node_inds])
+
+            beta[i, :] = beta[i, :]/np.sum(beta[i, :])
+
+        return beta
