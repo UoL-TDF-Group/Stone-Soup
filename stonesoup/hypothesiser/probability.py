@@ -150,4 +150,4 @@ class PDAHypothesiser(Hypothesiser):
                     probability,
                     measurement_prediction))
 
-        return MultipleHypothesis(hypotheses, normalise=True, total_weight=1)
+        return MultipleHypothesis(hypotheses, normalise=False)
