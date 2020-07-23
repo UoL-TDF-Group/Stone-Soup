@@ -317,23 +317,15 @@ class JPDAwithEHM(JPDA):
                                  default=-1)
             detections = Property(set, doc="Set of detection indices examined up to that node",
                                     default=None)
-            parents = Property(set, doc="Set of parent node indices",
-                               default=None)
-            children = Property(set, doc="Set of child node indices",
-                                default=None)
             remainders = Property(set, doc="Set of remainder detection indices",
-                                  default = None)
+                                  default=None)
 
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, **kwargs)
                 if self.detections is None:
                     self.detections = set()
-                if self.parents is None:
-                    self.parents = set()
-                if self.children is None:
-                    self.children = set()
                 if self.remainders is None:
-                    self.remainders = set([di for di in range(num_detections + 1)])
+                    self.remainders = set()
 
         class Net(Base):
             nodes = Property([Node], doc="List of nodes in the net")
@@ -348,16 +340,15 @@ class JPDAwithEHM(JPDA):
                 return len(self.nodes)
 
             def add_node(self, node, parent_ind, detections):
-                child_ind = len(self.nodes)
+
+                # Add node to graph
                 self.nodes.append(node)
 
-                # Add child to list of parent's children
-                self.nodes[parent_ind].children.add(child_ind)
-
                 # Create edge from parent to child
+                child_ind = len(self.nodes) - 1
                 net.edges[(parent_ind, child_ind)] = detections
 
-
+        # Initialise net
         root_node = Node()
         net = Net([root_node])
 
@@ -419,9 +410,6 @@ class JPDAwithEHM(JPDA):
                                     net.edges[(p_i, c_i)].add(j)
                                 else:
                                     net.edges[(p_i, c_i)] = {j}
-
-                                parent.children.add(c_i)
-                                child.parents.add(p_i)
                                 child.detections |= parent.detections | {j}
 
                                 matched = True
@@ -452,8 +440,8 @@ class JPDAwithEHM(JPDA):
         for c_i, child in enumerate(net.nodes):
             if not c_i:
                 continue
-            # parents = [edge[0] for edge in net.edges if edge[1] == c_i]
-            for p_i in child.parents:
+            parents = [edge[0] for edge in net.edges if edge[1] == c_i]
+            for p_i in parents:
                 p_D_m1 = p_D[p_i]
                 for j in net.edges[(p_i, c_i)]:
                     p_D[c_i] += l_matrix[child.track_ind, j]*p_D_m1
@@ -464,7 +452,8 @@ class JPDAwithEHM(JPDA):
         for p_i, parent in reversed(list(enumerate(net.nodes))):
             if p_i == net.num_nodes-1:
                 continue
-            for c_i in parent.children:
+            children = [edge[1] for edge in net.edges if edge[0] == p_i]
+            for c_i in children:
                 child = net.nodes[c_i]
                 p_U_p1 = p_U[c_i]
                 if (p_i, c_i) in net.edges:
@@ -497,7 +486,7 @@ class JPDAwithEHM(JPDA):
             node_inds = [n_i for n_i, node in enumerate(net.nodes) if node.track_ind == i]
             for j in range(num_detections):
                 beta[i, j] = np.sum(p_T[j, node_inds])
-
+            # Normalise
             beta[i, :] = beta[i, :]/np.sum(beta[i, :])
 
         return beta
