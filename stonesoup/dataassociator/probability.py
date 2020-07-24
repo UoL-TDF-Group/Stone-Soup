@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
+import itertools
 import numpy as np
 
+
 from .base import DataAssociator
-from ..base import Property, Base
+from ..base import Property
 from ..hypothesiser import Hypothesiser
 from ..hypothesiser.probability import PDAHypothesiser
 from ..types.detection import MissedDetection
@@ -10,7 +12,9 @@ from ..types.hypothesis import (
     SingleProbabilityHypothesis, ProbabilityJointHypothesis)
 from ..types.multihypothesis import MultipleHypothesis
 from ..types.numeric import Probability
-import itertools
+
+from ._ehm import (calc_validation_and_likelihood_matrices, construct_ehm_net,
+                   compute_association_probabilities, gen_clusters)
 
 
 class PDA(DataAssociator):
@@ -215,7 +219,17 @@ class JPDA(DataAssociator):
         return True
 
 
-class JPDAwithEHM(JPDA):
+class JPDAWithEHM(JPDA):
+    """ Joint Probabilistic Data Association with Efficient Hypothesis Management
+
+    This is a faster alternative of the standard :class:`~.JPDA` algorithm, which makes use of
+    Efficient Hypothesis Management (EHM) to efficiently compute the joint associations. See
+    Maskell et al. (2004) [#]_ for more details.
+
+    .. [#] Simon Maskell, Mark Briers, Robert Wright, "Fast mutual exclusion," Proc. SPIE 5428,
+           Signal and Data Processing of Small Targets 2004;
+    """
+
     def associate(self, tracks, detections, time):
         """Associate detections with predicted states.
 
@@ -240,28 +254,59 @@ class JPDAwithEHM(JPDA):
             track: self.hypothesiser.hypothesise(track, detections, time)
             for track in tracks}
 
-        new_hypotheses = self._run_EHM(tracks, detections, hypotheses, time)
+        joint_hypotheses = self._compute_joint_hypotheses(tracks, detections, hypotheses, time)
 
-        return new_hypotheses
+        return joint_hypotheses
 
-    def _run_EHM(self, tracks, detections, hypotheses, time):
+    def _compute_joint_hypotheses(self, tracks, detections, hypotheses, time):
 
+        # Tracks and detections must be in a list so we can keep track of their order
         track_list = list(tracks)
         detection_list = list(detections)
 
-        net, l_matrix = self._construct_EHM_net(track_list, detection_list, hypotheses)
-        a_matrix = self._compute_association_weights(net, l_matrix)
+        # Get validation and likelihood matrices
+        validation_matrix, likelihood_matrix = \
+            calc_validation_and_likelihood_matrices(track_list, detection_list, hypotheses)
+
+        # Cluster tracks into groups that share common detections
+        clusters, missed_tracks = gen_clusters(validation_matrix[:, 1:])
+
+        # Initialise the association probabilities matrix.
+        assoc_prob_matrix = np.zeros(likelihood_matrix.shape)
+        assoc_prob_matrix[missed_tracks, 0] = 1  # Null hypothesis is certain for missed tracks
+
+        # Perform EHM for each cluster
+        for cluster in clusters:
+
+            # Extract track and detection indices
+            # Note that the detection indices are adjusted to include the null hypothesis index (0)
+            track_inds = np.sort(list(cluster.rows))
+            detection_inds = np.sort(np.array(list(cluster.cols | {-1}))+1)
+
+            # Extract validation and likelihood matrices for cluster
+            c_validation_matrix = validation_matrix[track_inds, :][:, detection_inds]
+            c_likelihood_matrix = likelihood_matrix[track_inds, :][:, detection_inds]
+
+            # Construct the EHM net
+            net = construct_ehm_net(c_validation_matrix)
+
+            # Compute the association probabilities
+            c_assoc_prob_matrix = compute_association_probabilities(net, c_likelihood_matrix)
+
+            # Map the association probabilities to the main matrix
+            for i, track_ind in enumerate(track_inds):
+                assoc_prob_matrix[track_ind, detection_inds] = c_assoc_prob_matrix[i, :]
 
         # Calculate MultiMeasurementHypothesis for each Track over all
-        # available Detections with probabilities drawn from JointHypotheses
+        # available Detections with probabilities drawn from the association matrix
         new_hypotheses = dict()
 
         for i, track in enumerate(track_list):
 
             single_measurement_hypotheses = list()
 
-            prob_misdetect = Probability(a_matrix[i, 0])
-
+            # Null measurement hypothesis
+            prob_misdetect = Probability(assoc_prob_matrix[i, 0])
             single_measurement_hypotheses.append(
                 SingleProbabilityHypothesis(
                     hypotheses[track][0].prediction,
@@ -269,17 +314,16 @@ class JPDAwithEHM(JPDA):
                     measurement_prediction=hypotheses[track][0].measurement_prediction,
                     probability=prob_misdetect))
 
-            # record hypothesis for any given Detection being associated with
-            # this track
+            # True hypotheses
             for hypothesis in hypotheses[track]:
                 if not hypothesis:
                     continue
 
-                j = next(i+1 for i, detection in enumerate(detection_list)
+                # Get the detection index
+                j = next(d_i+1 for d_i, detection in enumerate(detection_list)
                          if hypothesis.measurement == detection)
 
-                pro_detect_assoc = Probability(a_matrix[i, j])
-
+                pro_detect_assoc = Probability(assoc_prob_matrix[i, j])
                 single_measurement_hypotheses.append(
                     SingleProbabilityHypothesis(
                         hypothesis.prediction,
@@ -287,201 +331,6 @@ class JPDAwithEHM(JPDA):
                         measurement_prediction=hypothesis.measurement_prediction,
                         probability=pro_detect_assoc))
 
-            result = MultipleHypothesis(single_measurement_hypotheses, True, 1)
-
-            new_hypotheses[track] = result
+            new_hypotheses[track] = MultipleHypothesis(single_measurement_hypotheses, True, 1)
 
         return new_hypotheses
-
-    @staticmethod
-    def _construct_EHM_net(tracks, detections, hypotheses):
-
-        num_tracks = len(tracks)
-        num_detections = len(detections)
-
-        # Construct validation and likelihood matrices
-        # Both matrices have shape (num_tracks, num_detections + 1), where the first column
-        # corresponds to the null hypothesis.
-        l_matrix = np.zeros((num_tracks, num_detections + 1))
-        for i, track in enumerate(tracks):
-            for hyp in hypotheses[track]:
-                if not hyp:
-                    l_matrix[i, 0] = hyp.weight
-                else:
-                    j = next(d_i for d_i, detection in enumerate(detections)
-                             if hyp.measurement == detection)
-                    l_matrix[i, j+1] = hyp.weight
-        v_matrix = l_matrix > 0
-
-        class Node:
-            ind = None
-
-            def __init__(self, track_ind=-1, detections=None, remainders=None):
-                self.track_ind = track_ind
-                self.detections = detections if detections is not None else set()
-                self.remainders = remainders if remainders is not None else set()
-
-        class Net:
-
-            def __init__(self, nodes, edges=None):
-                for n_i, node in enumerate(nodes):
-                    node.ind = n_i
-                self.nodes = nodes
-                self.edges = edges if edges is not None else dict()
-
-            @property
-            def num_nodes(self):
-                return len(self.nodes)
-
-            def add_node(self, node, parent, detections):
-
-                # Add node to graph
-                node.ind = len(self.nodes)
-                self.nodes.append(node)
-
-                # Create edge from parent to child
-                self.edges[(parent, child)] = detections
-
-            def get_parents(self, node):
-                return [edge[0] for edge in self.edges if edge[1] == node]
-
-            def get_children(self, node):
-                return [edge[1] for edge in self.edges if edge[0] == node]
-
-        # Initialise net
-        root_node = Node()
-        net = Net([root_node])
-
-        # A layer in the network is created for each track (not counting the root-node layer)
-        num_layers = num_tracks
-        for i in range(num_layers):
-
-            # Get list of (index, node) of nodes in previous layer
-            parent_nodes = [node for node in net.nodes if node.track_ind == i-1]
-
-            # Get indices of measurements associated with track
-            v_detection_inds = set(np.nonzero(v_matrix[i, :])[0])
-
-            # For all nodes in previous layer
-            for parent in parent_nodes:
-
-                # Get measurements to consider
-                v_detection_inds_m1 = v_detection_inds - parent.detections | {0}
-
-                # Iterate over measurements
-                for j in v_detection_inds_m1:
-
-                    # Get list of (index, node) of nodes in current layer
-                    child_nodes = [node for node in net.nodes if node.track_ind == i]
-
-                    # If layer is empty, add new node
-                    if not len(child_nodes):
-
-                        # Create new node
-                        child = Node(i, parent.detections | {j})
-
-                        # Compute remainders
-                        remainders = set()
-                        for ii in range(i + 1, num_layers):
-                            remainders |= set(np.nonzero(v_matrix[ii, :])[0])
-                        child.remainders = remainders - (child.detections - {0})
-
-                        # Add node to net
-                        net.add_node(child, parent, {j})
-                    else:
-                        # Compute remainders (i-1)
-                        remainders_im1 = set()
-                        for ii in range(i + 1, num_layers):
-                            remainders_im1 |= set(np.nonzero(v_matrix[ii, :])[0])
-                        remainders_im1 -= (parent.detections | {j}) - {0}
-
-                        # Find valid nodes in current layer
-                        v_children = [child for child in child_nodes
-                                      if remainders_im1 == child.remainders]
-                        if len(v_children):
-                            # Simply add new edge and update parent/child relationships
-                            for child in v_children:
-                                if (parent, child) in net.edges:
-                                    net.edges[(parent, child)].add(j)
-                                else:
-                                    net.edges[(parent, child)] = {j}
-                                child.detections |= parent.detections | {j}
-                        else:
-                            # Create new node
-                            child = Node(i, parent.detections | {j})
-
-                            # Compute remainders
-                            remainders = set()
-                            for ii in range(i + 1, num_layers):
-                                remainders |= set(np.nonzero(v_matrix[ii, :])[0])
-                            child.remainders = remainders - (child.detections - {0})
-
-                            # Add node to net
-                            net.add_node(child, parent, {j})
-
-        return net, l_matrix
-
-    @staticmethod
-    def _compute_association_weights(net, l_matrix):
-        num_tracks, num_detections = l_matrix.shape
-        num_nodes = net.num_nodes
-
-        # Compute p_D (Forward-pass)
-        p_D = np.zeros((num_nodes, ))
-        p_D[0] = 1
-        for child in net.nodes:
-            c_i = child.ind
-            if not c_i:
-                continue
-            parents = net.get_parents(child)
-            for parent in parents:
-                p_i = parent.ind
-                p_D_m1 = p_D[p_i]
-                for j in net.edges[(parent, child)]:
-                    p_D[c_i] += l_matrix[child.track_ind, j]*p_D_m1
-
-        # Compute p_U (Backward-pass)
-        p_U = np.zeros((num_nodes, ))
-        p_U[-1] = 1
-        for p_i, parent in reversed(list(enumerate(net.nodes))):
-            if p_i == net.num_nodes-1:
-                continue
-            children = net.get_children(parent)
-            for child in children:
-                c_i = child.ind
-                p_U_p1 = p_U[c_i]
-                if (parent, child) in net.edges:
-                    for j in net.edges[(parent, child)]:
-                        p_U[p_i] += l_matrix[child.track_ind, j]*p_U_p1
-
-        # Compute p_DT
-        p_DT = np.zeros((num_detections, num_nodes))
-        for c_i, child in enumerate(net.nodes):
-            for j in range(num_detections):
-                v_parents = [edge[0] for edge, value in net.edges.items()
-                             if (edge[1] == child and j in value)]
-
-                for parent in v_parents:
-                    p_i = parent.ind
-                    p_D_m1 = p_D[p_i]
-                    p_DT[j, c_i] += p_D_m1
-
-        # Compute p_T
-        p_T = np.ones((num_detections, num_nodes))
-        p_T[:, 0] = 0
-        for n_i, node in enumerate(net.nodes):
-            if not n_i:
-                continue
-            for j in range(num_detections):
-                p_T[j, n_i] = p_U[n_i]*l_matrix[node.track_ind, j]*p_DT[j, n_i]
-
-        # Compute beta
-        beta = np.zeros(l_matrix.shape)
-        for i in range(num_tracks):
-            node_inds = [n_i for n_i, node in enumerate(net.nodes) if node.track_ind == i]
-            for j in range(num_detections):
-                beta[i, j] = np.sum(p_T[j, node_inds])
-            # Normalise
-            beta[i, :] = beta[i, :]/np.sum(beta[i, :])
-
-        return beta
